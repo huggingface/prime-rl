@@ -1,0 +1,37 @@
+max_steps = 100
+seq_len = 4096
+
+[deployment]
+num_train_gpus = 2
+num_infer_gpus = 6
+
+[model]
+name = "Qwen/Qwen3-4B"
+
+[wandb]
+project = "prime-rl-bench"
+name = "qwen3-4b-mbpp"
+
+[orchestrator.wandb.log_extras]
+samples = true
+interval = 10
+distributions = true
+
+# [trainer.wandb.log_extras]                                                                                                                                                                                █
+# samples = true                                                                                                                                                                                            █
+# interval = 5
+
+[trainer.optim]
+lr = 1e-6
+weight_decay = 0.1
+
+[orchestrator]
+batch_size = 256
+rollouts_per_example = 16
+
+[[orchestrator.env]]
+id = "mbpp-env"
+args = { max_turns = 5 }
+
+[inference.model]
+tool_call_parser = "hermes"

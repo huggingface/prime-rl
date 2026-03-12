@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mbpp-env"
+version = "0.1.0"
+dependencies = [
+    "verifiers",
+    "datasets"
+]
+
+[project.entry-points."verifiers"]
+mbpp-env = "mbpp_env:load_environment"
