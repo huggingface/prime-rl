@@ -500,6 +500,7 @@ def train(config: TrainerConfig):
         throughput = perf_counter.get_tokens_per_second() or 0
         mfu = perf_counter.get_mfu() or 0
         peak_memory = torch.cuda.max_memory_reserved() / 1024**3  # GiB
+        dp_size = parallel_dims.get_mesh("dp").size()
 
         # Log step metrics
         step_time = time.perf_counter() - step_start_time
@@ -517,6 +518,9 @@ def train(config: TrainerConfig):
             "perf/throughput_per_gpu": throughput / world.world_size,
             "perf/mfu": mfu,
             "perf/peak_memory": peak_memory,
+            "perf/micro_batches_per_gpu": batch_size,
+            "perf/global_micro_batches": batch_size * dp_size,
+            "perf/seq_len": seq_len,
             "step": progress.step,
         }
         monitor.log(perf_metrics, step=progress.step)
