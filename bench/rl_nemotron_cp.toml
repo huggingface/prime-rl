@@ -1,0 +1,50 @@
+max_steps = 100
+seq_len = 24576
+output_dir = "/fsx/amine_dirhoussi/bench_rl/Qwen3-4B_prime-rl"
+
+[ckpt]
+interval = 10
+
+[deployment]
+num_train_gpus = 2
+num_infer_gpus = 6
+
+[model]
+name = "Qwen/Qwen3-4B"
+
+[wandb]
+project = "prime-rl-bench"
+name = "qwen3-4b-nemotron-cp"
+
+[trainer.model]
+# optim_cpu_offload = true
+tp = 2
+fused_lm_head_token_chunk_size = "auto"
+
+# activation checkpoint to fit 24k tokens
+[trainer.model.ac]
+
+[trainer.optim]
+lr = 1e-6
+weight_decay = 0.1
+
+[orchestrator]
+batch_size = 128
+rollouts_per_example = 16 # group_size in GRPO
+
+[orchestrator.sampling]
+max_tokens = 24576
+
+[[orchestrator.env]]
+id = "nemotron-env"
+args = { max_turns = 5 }
+
+[inference.model]
+tool_call_parser = "hermes"
+# vllm server level param for KV cache alloc
+max_model_len = 24576
+
+[orchestrator.wandb.log_extras]
+samples = true
+interval = 10
+distributions = true
