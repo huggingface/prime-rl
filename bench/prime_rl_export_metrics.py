@@ -1,9 +1,10 @@
-import wandb
-import pandas as pd
-import numpy as np
-import json
-from scipy.stats import linregress
 import argparse
+import json
+
+import numpy as np
+import pandas as pd
+import wandb
+from scipy.stats import linregress
 
 
 def main():
@@ -30,20 +31,48 @@ def main():
     train_system = train_run.history(stream="events", pandas=True)
 
     # Clean data
-    orch_df = orch_history
-    train_df = train_history
+    WARMUP_STEPS = 5
+    orch_df = orch_history[orch_history["step"] >= WARMUP_STEPS] if "step" in orch_history.columns else orch_history
+    train_df = (
+        train_history[train_history["step"] >= WARMUP_STEPS] if "step" in train_history.columns else train_history
+    )
 
-    # T1: End-to-end tokens/second
-    # Prime-RL: Total generated tokens + Total trained tokens / max runtime
-    max_runtime = max(orch_df.get("_runtime", pd.Series([0])).max(), train_df.get("_runtime", pd.Series([0])).max())
+    # Calculate valid runtimes
+    orch_runtime_start = (
+        orch_history[orch_history["step"] == WARMUP_STEPS]["_runtime"].min()
+        if not orch_history[orch_history["step"] == WARMUP_STEPS].empty
+        else 0
+    )
+    orch_runtime_end = orch_df["_runtime"].max() if not orch_df.empty else 0
+    orch_runtime = orch_runtime_end - orch_runtime_start
 
-    total_gen_tokens = orch_df.get("progress/total_tokens", pd.Series([0])).max()
+    train_runtime_start = (
+        train_history[train_history["step"] == WARMUP_STEPS]["_runtime"].min()
+        if not train_history[train_history["step"] == WARMUP_STEPS].empty
+        else 0
+    )
+    train_runtime_end = train_df["_runtime"].max() if not train_df.empty else 0
+    train_runtime = train_runtime_end - train_runtime_start
+
+    max_runtime = max(orch_runtime, train_runtime)
+
+    # T1, T2, T3: Throughput
+    orch_tokens_start = (
+        orch_history[orch_history["step"] == WARMUP_STEPS]["progress/total_tokens"].min()
+        if not orch_history[orch_history["step"] == WARMUP_STEPS].empty
+        else 0
+    )
+    orch_tokens_end = orch_df.get("progress/total_tokens", pd.Series([0])).max()
+    total_gen_tokens = orch_tokens_end - orch_tokens_start
+
     if "perf/throughput" in train_df and "time/step" in train_df:
         total_train_tokens = (train_df["perf/throughput"] * train_df["time/step"]).sum()
     else:
         total_train_tokens = 0
 
     t1_e2e_throughput = (total_gen_tokens + total_train_tokens) / max_runtime if max_runtime > 0 else 0
+    t2_train_throughput = total_train_tokens / max_runtime if max_runtime > 0 else 0
+    t3_gen_throughput = total_gen_tokens / max_runtime if max_runtime > 0 else 0
 
     # L2: Reward trend
     if "reward/all/mean" in orch_df.columns and "step" in orch_df.columns:
@@ -57,9 +86,9 @@ def main():
 
     # ---- System Metrics Processing ----
     def get_system_metrics(sys_df):
-        gpu_util_cols = [c for c in sys_df.columns if "system.gpu." in c and ".gpu/l:" in c]
-        gpu_mem_cols = [c for c in sys_df.columns if "system.gpu." in c and ".memoryAllocatedBytes/l:" in c]
-        cpu_mem_cols = [c for c in sys_df.columns if "system.memory_percent/l:" in c]
+        gpu_util_cols = [c for c in sys_df.columns if "system.gpu." in c and c.endswith(".gpu")]
+        gpu_mem_cols = [c for c in sys_df.columns if "system.gpu." in c and ".memoryAllocatedBytes" in c]
+        cpu_mem_cols = [c for c in sys_df.columns if "system.memory_percent" in c]
         return gpu_util_cols, gpu_mem_cols, cpu_mem_cols
 
     orch_util, orch_mem, orch_cpu = get_system_metrics(orch_system)
@@ -124,8 +153,8 @@ def main():
     summary = {
         # 4.1 Throughput
         "T1_e2e_tokens_per_sec_mean": t1_e2e_throughput,
-        "T2_train_tokens_per_sec_mean": train_df.get("perf/throughput", pd.Series(dtype=float)).mean(),
-        "T3_gen_tokens_per_sec_mean": orch_df.get("perf/throughput", pd.Series(dtype=float)).mean(),
+        "T2_train_tokens_per_sec_mean": t2_train_throughput,
+        "T3_gen_tokens_per_sec_mean": t3_gen_throughput,
         "T5_steps_per_hour_mean": 3600 / train_df["time/step"].mean() if "time/step" in train_df.columns else None,
         "T6_wall_clock_time_100_steps": t6_wall_clock,
         # 4.2 Hardware Utilization
@@ -158,26 +187,11 @@ def main():
     with open(summary_file, "w") as f:
         # Convert pandas/numpy types to native Python types for JSON
         def convert(obj):
-            if isinstance(
-                obj,
-                (
-                    np.int_,
-                    np.intc,
-                    np.intp,
-                    np.int8,
-                    np.int16,
-                    np.int32,
-                    np.int64,
-                    np.uint8,
-                    np.uint16,
-                    np.uint32,
-                    np.uint64,
-                ),
-            ):
+            if isinstance(obj, (int, np.integer)):
                 return int(obj)
-            elif isinstance(obj, (np.float16, np.float32, np.float64)):
+            elif isinstance(obj, (float, np.floating)):
                 return float(obj)
-            elif isinstance(obj, (np.ndarray,)):
+            elif isinstance(obj, np.ndarray):
                 return obj.tolist()
             elif pd.isna(obj):
                 return None
