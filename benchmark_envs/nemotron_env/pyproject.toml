@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nemotron-env"
+version = "0.1.0"
+dependencies = [
+    "verifiers",
+    "datasets"
+]
+
+[project.entry-points."verifiers"]
+nemotron-env = "nemotron_env:load_environment"
