@@ -1,9 +1,11 @@
-max_steps = 100
+max_steps = 1000
 seq_len = 24576
 output_dir = "/fsx/amine_dirhoussi/bench_rl/Qwen3-4B_prime-rl"
+# clean_output_dir = true
 
 [ckpt]
 interval = 10
+resume_step=-1
 
 [deployment]
 num_train_gpus = 2
@@ -20,6 +22,9 @@ name = "qwen3-4b-nemotron-cp"
 # optim_cpu_offload = true
 tp = 2
 fused_lm_head_token_chunk_size = "auto"
+# cp = 1
+# dp_replicate: HSDP
+# dp_shard = world_size // (tp * cp * dp_replicate)
 
 # activation checkpoint to fit 24k tokens
 [trainer.model.ac]
@@ -29,8 +34,8 @@ lr = 1e-6
 weight_decay = 0.1
 
 [orchestrator]
-batch_size = 128
 rollouts_per_example = 16 # group_size in GRPO
+batch_size = 128 # 8 prompts per batch
 
 [orchestrator.sampling]
 max_tokens = 24576
