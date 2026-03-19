@@ -1,0 +1,38 @@
+max_steps = 100
+seq_len = 2048
+
+output_dir = "/fsx/amine_dirhoussi/bench_rl/Qwen3-0.6b_immediate"
+clean_output_dir = true
+
+[deployment]
+num_train_gpus = 1
+num_infer_gpus = 1
+
+
+
+[model]
+name = "Qwen/Qwen3-0.6B"
+
+[wandb]
+project = "prime-rl-bench"
+name = "rl-test-immediate-eos"
+
+[orchestrator.wandb.log_extras]
+samples = true
+interval = 1
+distributions = true
+
+[orchestrator]
+batch_size = 64
+rollouts_per_example = 8
+
+[orchestrator.sampling]
+max_tokens = 512
+
+[[orchestrator.env]]
+id = "immediate-eos-env"
+
+[trainer.optim]
+lr = 1e-6
+
+[inference]
