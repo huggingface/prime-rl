@@ -12,7 +12,7 @@ jobs:
   trigger-docs-sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Validate mint.json pages exist
         run: |
@@ -46,7 +46,7 @@ jobs:
           echo "All mint.json pages verified."
 
       - name: Trigger public-docs workflow
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0  # v3.0.0
         with:
           token: ${{ secrets.DOCS_SYNC_PAT }}
           repository: PrimeIntellect-ai/public-docs
